@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple place to share updates and see what people are posting.">
+  <title>Commonplace | Share your thoughts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Commonplace home">
+      <span class="brand-mark">C</span>
+      <span>commonplace</span>
+    </a>
+    <div class="header-note"><span class="status-dot"></span> the internet, at its nicest</div>
+    <div class="header-actions">
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode">Dark mode</button>
+      <button class="avatar avatar-small" type="button" aria-label="Your profile">JD</button>
+    </div>
+  </header>
+
+  <main class="page-shell" id="top">
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">A small social space</p>
+      <h1 id="page-title">What is on<br><em>your mind?</em></h1>
+      <p class="intro-copy">Share a thought, a win, or something worth passing along.</p>
+    </section>
+
+    <section class="composer panel" aria-labelledby="composer-title">
+      <div class="composer-topline">
+        <div class="avatar">JD</div>
+        <div>
+          <h2 id="composer-title">Start a post</h2>
+          <p>Your little corner of the feed.</p>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('index') }}">
+        <input type="hidden" name="action" value="create">
+        <label class="sr-only" for="post-text">Write your post</label>
+        <textarea id="post-text" name="text" maxlength="280" placeholder="Write something worth sharing..." required></textarea>
+        <div class="composer-footer">
+          <span class="character-count"><span id="character-count">0</span>/280</span>
+          <button class="button button-primary" type="submit">Post it <span aria-hidden="true">-&gt;</span></button>
+        </div>
+      </form>
+    </section>
+
+    <section class="feed-section" aria-labelledby="feed-title">
+      <div class="feed-heading">
+        <div>
+          <p class="eyebrow">The latest</p>
+          <h2 id="feed-title">Community feed</h2>
+        </div>
+        <form method="get" action="{{ url_for('index') }}">
+          <input type="hidden" name="sort" value="{{ 'oldest' if newest_first else 'newest' }}">
+          <button class="sort-button" type="submit">{{ 'Newest' if newest_first else 'Oldest' }}</button>
+        </form>
+      </div>
+
+      {% if posts %}
+        <div class="feed" aria-live="polite">
+          {% for post in posts %}
+            <article class="post">
+              <div class="post-meta">
+                <div class="avatar">{{ post.initials }}</div>
+                <div>
+                  <div class="post-author">{{ post.author }}</div>
+                  <div class="post-time">{{ format_time(post.createdAt) }}</div>
+                </div>
+              </div>
+              <p class="post-text">{{ post.text }}</p>
+              <div class="post-actions">
+                <form method="post" action="{{ url_for('toggle_like', post_id=post.id) }}">
+                  <input type="hidden" name="sort" value="{{ 'oldest' if not newest_first else 'newest' }}">
+                  <button class="action-button {% if post.liked %}liked{% endif %}" type="submit">{{ 'Liked' if post.liked else 'Like' }} &middot; {{ post.likes }}</button>
+                </form>
+                <button class="action-button share-button" type="button" data-share-text="{{ post.author }}: {{ post.text }}">Share</button>
+              </div>
+
+              <div class="post-comments">
+                {% set comments = post.get('comments', []) %}
+                {% if comments %}
+                  <ul class="comment-list">
+                    {% for comment in comments %}
+                      <li class="comment-item">
+                        <span class="comment-author">{{ comment.author }}</span>
+                        <span class="comment-text">{{ comment.text }}</span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+
+                <form class="comment-form" method="post" action="{{ url_for('add_comment', post_id=post.id) }}">
+                  <input type="hidden" name="sort" value="{{ 'oldest' if not newest_first else 'newest' }}">
+                  <input class="comment-input" type="text" name="text" maxlength="180" placeholder="Write a comment..." aria-label="Write a comment" required>
+                  <button class="comment-button" type="submit">Comment</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">No posts yet. Be the first to say something.</p>
+      {% endif %}
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Made for sharing the good stuff.</span>
+    <span>Commonplace / 2026</span>
+  </footer>
+
+  <script>
+    const textInput = document.querySelector('#post-text');
+    const characterCount = document.querySelector('#character-count');
+    const themeToggle = document.querySelector('#theme-toggle');
+
+    const savedTheme = localStorage.getItem('commonplace-theme');
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark-mode');
+      if (themeToggle) themeToggle.textContent = 'Light mode';
+    }
+
+    if (textInput && characterCount) {
+      textInput.addEventListener('input', () => {
+        characterCount.textContent = textInput.value.length;
+      });
+    }
+
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        const isDark = document.body.classList.toggle('dark-mode');
+        localStorage.setItem('commonplace-theme', isDark ? 'dark' : 'light');
+        themeToggle.textContent = isDark ? 'Light mode' : 'Dark mode';
+      });
+    }
+
+    document.addEventListener('click', async (event) => {
+      const button = event.target.closest('.share-button');
+      if (!button) return;
+
+      const shareText = button.dataset.shareText || '';
+      const originalText = button.textContent;
+
+      try {
+        await navigator.clipboard.writeText(shareText);
+        button.textContent = 'Copied';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 1400);
+      } catch (error) {
+        button.textContent = 'Copy unavailable';
+      }
+    });
+  </script>
+</body>
+</html>
